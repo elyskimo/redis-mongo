@@ -1,76 +1,82 @@
 // const db = require('sqlite')
-const Redis = require('ioredis')
-const redis = new Redis()
-
+// const Redis = require('ioredis')
+// const redis = new Redis()
+const mongoose = require('mongoose');
+mongoose.connect('mongodb://localhost:27017/test', {useNewUrlParser: true});
+var db = mongoose.connection;
+db.on('error', console.error.bind(console, 'connection error:'));
+db.once('open', function() {
+  // we're connected!
+  console.log("DB CONNECTED");
+});
+var usersSchema = new mongoose.Schema({
+  id: String,
+  pseudo: String,
+  firstname: String,
+  lastname: String,
+  email: String,
+  password: String
+});
+var User = mongoose.model('User', usersSchema);
+// module.exports = mongoose.model('User', usersSchema);
+​
 module.exports = {
+  
   get: async (userId) => {
-    const user = await redis.hgetall(`user:${userId}`)
+    console.log("get user")
+    const user = await User.find({id:userId})
+    console.log(user)
     return user
   },
-
+​
   count: async() => {
-   return await redis.scard('users')	
-//  return redis.dbsize()	
+   return await User.count({})
   },
-
+​
   getAll: async (limit, offset) => {
-    // console.log(await redis.keys('user:*'))
-    let users=[]
-    let userKeys = await redis.smembers('users')
-    //console.log(await redis.hget(userKeys[0],"pseudo"))
-    for (let index = 0; index < userKeys.length; index++) {
-      //console.log(await redis.hgetall(userKeys[index],"pseudo"))
-      const user = await redis.hgetall(`user:${userKeys[index]}`)
-      user['rowid']=userKeys[index]
-      users.push(user)
-      
-    }
-   
+    const users = await User.find()
+  //  console.log(users)
    return users
-   //return redis.zrange('user',0,-1)
+​
   },
-
+​
   insert: async (params) => {
-	const pipeline = redis.pipeline()
-	const userId = require('uuid').v4()
-  
-  pipeline.sadd('users',userId)
-	pipeline.hmset(`user:${userId}`, {
-    id: userId,
-		pseudo: params.pseudo,
-		firstname: params.firstname,
-		lastname: params.lastname,
-		email: params.email,
-		password: params.password})
-
-	// pipeline.sadd('users', userId)
-
-	return await pipeline.exec()
-
+    const userId = require('uuid').v4()
+    let user = { id: userId,
+                pseudo: params.pseudo,
+                firstname: params.firstname,
+                lastname: params.lastname,
+                email: params.email,
+                password: params.password }
+    let doc = await User.collection.insertMany([user], function(err) {
+          console.log("insert error")
+      })
+    console.log(user)
+    console.log(doc)
+​
+	return doc
+​
   },
-
+​
   update: async(userId, params) => {
-    const pipeline = redis.pipeline()
-    
-    pipeline.hmset(`user:${userId}`, {
-    id: userId,
-		pseudo: params.pseudo,
-		firstname: params.firstname,
-		lastname: params.lastname,
-		email: params.email,
-		password: params.password})
-
-    // pipeline.sadd('users', userId)
-
-    return await pipeline.exec()
+    let user = { id: userId,
+      pseudo: params.pseudo,
+      firstname: params.firstname,
+      lastname: params.lastname,
+      email: params.email,
+      password: params.password }
+    const doc = await User.updateOne({id:userId},user, function(err) {
+        console.log("update error")
+    })
+​
+    return doc
  
   },
-
+​
   remove: async(userId) => {
-    const pipeline = redis.pipeline()
-    pipeline.srem('users',userId)
-    pipeline.del(`user:${userId}`)
-    return await pipeline.exec()
+    console.log("delete")
+    const doc = await User.deleteOne({id:userId})
+    return doc
   }
-
+​
 }
